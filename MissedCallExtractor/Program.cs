@@ -2,29 +2,71 @@ using Microsoft.VisualBasic.FileIO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 
 namespace MissedCallExtractor
 {
     class Program
-    {
-        
-        
+    {        
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
-            List<Records> listRecords = ParseExcel();
-            List<Records> missedNumbers = GetMissedNumbers(listRecords);
+            Console.WriteLine("Welcome to missed calls extractor !!");
+            Console.WriteLine("------------------------------------");            
 
-            foreach(Records missedNumber in missedNumbers)
+            string fileName = "Report[" + DateTime.Now.ToString("dd-MMM-yyyy") + 
+            " to " + DateTime.Now.ToString("dd-MMM-yyyy") +"]"; 
+            string fileToParse = GetFileToParse(fileName);
+           
+            if(!String.IsNullOrEmpty(fileToParse)) 
             {
-                Console.WriteLine(missedNumber.Cli + " - " + missedNumber.DialStatus + " - " + missedNumber.CallStartTime + " - " + missedNumber.Dtmf );    
+                Console.WriteLine("Parsing file - " + fileToParse);
+                Console.WriteLine("");
+                List<Records> listRecords = ParseExcel(fileToParse);
+                List<Records> missedNumbers = GetMissedNumbers(listRecords);
+
+                if(missedNumbers.Count == 0) Console.WriteLine("No calls missed !! ");
+                else 
+                {
+                    foreach(Records missedNumber in missedNumbers)
+                    {
+                        Console.WriteLine(missedNumber.Cli + " - " + missedNumber.DialStatus + " - " + missedNumber.CallStartTime + " - " + missedNumber.Dtmf );    
+                    }
+                }
             }
+            Console.ReadLine();
         }
 
+        private static string GetFileToParse(string fileName)
+        {
+            string[] files = Directory.GetFiles(@"C:\users\daniel_irudayaraj\downloads", fileName + "*.csv");
+            string fileToParse = "";
+            if(files.Length == 1) fileToParse = files[0];
+            else if(files.Length > 1) {
+                DateTime fileModified = new DateTime();
+                foreach(string file in files)
+                {
+                    if(fileModified == null) 
+                    { 
+                        fileModified = File.GetLastWriteTime(file); 
+                        fileToParse = file;
+                    }
+                    else if(File.GetLastWriteTime(file) > fileModified) 
+                    {
+                        fileModified = File.GetLastWriteTime(file);
+                        fileToParse = file;
+                    }
+                }
+            }
+            else {
+                Console.WriteLine("No files found");
+            }            
+            return fileToParse;
+        }
         private static List<Records> GetMissedNumbers(List<Records> listRecords)
         {
             List<Records> missedRecords = new List<Records>();
-            listRecords = listRecords.OrderBy(x => x.CallStartTime).ToList<Records>();                
+            listRecords = listRecords.OrderBy(x => x.CallStartTime)
+                    .ThenBy(x => x.DialStatus).ToList<Records>();                
     
             foreach (Records records in listRecords) 
             {
@@ -52,13 +94,13 @@ namespace MissedCallExtractor
             return missedRecords;
         }
 
-        private static List<Records> ParseExcel()
+        private static List<Records> ParseExcel(string fileToParse)
         {
             int rowCounter = 0;
             int colCli = 0, colCallStartTime = 0, colDialStatus = 0, colDtmf = 0;
             List<Records> listRecords = new List<Records>();
 
-            using (TextFieldParser parser = new TextFieldParser(@"Report[14-Apr-2020 to 14-Apr-2020].csv"))
+            using (TextFieldParser parser = new TextFieldParser(fileToParse))
             {
                 parser.TextFieldType = FieldType.Delimited;
                 parser.SetDelimiters(",");
@@ -85,7 +127,8 @@ namespace MissedCallExtractor
                         Records records = new Records
                         {
                             Cli = fields[colCli],
-                            CallStartTime = Convert.ToDateTime(fields[colCallStartTime]),
+                            // CallStartTime = Convert.ToDateTime(fields[colCallStartTime]),
+                            CallStartTime = DateTime.ParseExact(fields[colCallStartTime], "dd-MM-yyyy HH:mm:ss", null),
                             DialStatus = fields[colDialStatus],
                             Dtmf = fields[colDtmf]
                         };
